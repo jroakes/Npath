@@ -1,1 +1,9 @@
 google-cloud-bigquery
+prefixspan
+mlxtend
+seq2pat
+matplotlib
+pandas
+hdbscan
+scikit-learn
+tqdm
