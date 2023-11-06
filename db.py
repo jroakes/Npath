@@ -1,3 +1,5 @@
+"""This module contains functions for querying data from BigQuery."""
+
 import re
 import os
 from google.cloud import bigquery
@@ -61,7 +63,25 @@ ORDER BY event_timestamp ASC
 
 
 def query_bigquery(table_name: str, historical_days: int) -> pd.DataFrame:
-    """Query BigQuery and return a Pandas DataFrame."""
+    """Query BigQuery and return a Pandas DataFrame.
+
+    Parameters
+    ----------
+    table_name : str
+        The name of the table to query.
+    historical_days : int
+        The number of days to query.
+
+    Returns
+    -------
+    pd.DataFrame
+        The query results.
+    """
+
+    # Check Cache
+    df = cached(table_name)
+    if df is not None:
+        return df
 
     # Load your service account credentials
     credentials = service_account.Credentials.from_service_account_file(
@@ -73,11 +93,6 @@ def query_bigquery(table_name: str, historical_days: int) -> pd.DataFrame:
 
     # Initialize a BigQuery client
     client = bigquery.Client(credentials=credentials, project=project_id)
-
-    # Check Cache
-    df = cached(table_name)
-    if df is not None:
-        return df
 
     query = QUERY_TEMPLATE.format(
         table_name=table_name, historical_days=historical_days
@@ -95,21 +110,27 @@ def query_bigquery(table_name: str, historical_days: int) -> pd.DataFrame:
     return df
 
 
-def cache(df: pd.DataFrame, table_name: str) -> None:
+def cache(df: pd.DataFrame, table_name: str) -> pd.DataFrame:
+    """Cache a Pandas DataFrame to a CSV file."""
     fn = re.sub(r"\W", "_", table_name) + ".csv"
-    df.to_csv(os.path.join("cache", fn), index=False)
+    file_path = os.path.join("cache", fn)
+    df.to_csv(file_path, index=False)
     return df
 
 
 def cached(table_name: str) -> pd.DataFrame:
+    """Check if a cached CSV file exists, and return a Pandas DataFrame if it does."""
     fn = re.sub(r"\W", "_", table_name) + ".csv"
+    file_path = os.path.join("cache", fn)
 
     # Check for cache folder, create if it doesn't exist
-    if not os.path.exists("cache"):
-        os.makedirs("cache")
+    os.makedirs("cache", exist_ok=True)
 
     # Check for cached file, return if it exists
-    if os.path.exists(os.path.join("cache", fn)):
-        return pd.read_csv(os.path.join("cache", fn))
+    if os.path.exists(file_path):
+        return pd.read_csv(file_path)
 
     return None
+
+
+# Path: db.py

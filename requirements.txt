@@ -1,9 +1,12 @@
 google-cloud-bigquery
 prefixspan
-mlxtend
-seq2pat
 matplotlib
 pandas
+umap-learn
 hdbscan
 scikit-learn
 tqdm
+pynndescent==0.5.8
+bertopic
+openai
+InstructorEmbedding

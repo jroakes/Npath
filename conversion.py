@@ -1,60 +1,176 @@
+"""Conversion Analysis."""
+
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.impute import SimpleImputer
+import umap
 import hdbscan
 from sklearn.ensemble import IsolationForest
-from prefixspan import PrefixSpan
-from itertools import product
-from joblib import Parallel, delayed
-from tqdm.auto import tqdm
-from IPython.display import display
+
+from feature import find_frequent_sequences
 
 
-def standardize_data(X):
-    """Standardizes the data."""
-    scaler = StandardScaler()
+def standardize_data(X: np.ndarray) -> np.ndarray:
+    """
+    Standardizes the data by removing the mean and scaling to unit variance.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        The input data to be standardized.
+
+    Returns
+    -------
+    np.ndarray
+        The standardized version of the input data.
+    """
+    scaler = StandardScaler(with_mean=True, with_std=True, copy=False)
     return scaler.fit_transform(X)
 
 
-def apply_pca(X, n_components=10):
-    """Applies PCA to reduce dimensionality."""
+def apply_umap(X: np.ndarray, n_components: int = 5) -> np.ndarray:
+    """
+    Applies Uniform Manifold Approximation and Projection (UMAP) to reduce dimensionality.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        The input data to be transformed.
+    n_components : int, optional
+        Number of components to keep, by default 5.
+
+    Returns
+    -------
+    np.ndarray
+        The transformed data.
+    """
+    reducer = umap.UMAP(n_components=n_components)
+    return reducer.fit_transform(X)
+
+
+def apply_pca(X: np.ndarray, n_components: int = 5) -> np.ndarray:
+    """
+    Applies Principal Component Analysis (PCA) to reduce dimensionality.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        The input data to be transformed.
+    n_components : int, optional
+        Number of components to keep, by default 5.
+
+    Returns
+    -------
+    np.ndarray
+        The transformed data.
+    """
     pca = PCA(n_components=n_components)
     return pca.fit_transform(X)
 
 
-def perform_clustering(X, min_cluster_size=3):
-    """Performs clustering using HDBSCAN."""
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size)
-    return clusterer.fit_predict(X)
+def perform_clustering(X: np.ndarray, min_cluster_size: int = 3) -> np.ndarray:
+    """
+    Performs clustering using HDBSCAN.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        The input data to be clustered.
+    min_cluster_size : int, optional
+        The minimum size of clusters, by default 3.
+
+    Returns
+    -------
+    np.ndarray
+        The labels of the clusters for each data point.
+    """
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=min_cluster_size, gen_min_span_tree=True
+    )
+    labels = clusterer.fit_predict(X)
+    return labels, clusterer
 
 
-def anomaly_detection(X, contamination=0.05):
-    """Performs anomaly detection using Isolation Forest."""
-    iso_forest = IsolationForest(contamination=contamination)
+def anomaly_detection(X: np.ndarray, contamination: float = 0.05) -> np.ndarray:
+    """
+    Performs anomaly detection using Isolation Forest.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        The input data for anomaly detection.
+    contamination : float, optional
+        The amount of contamination of the data set, i.e., the proportion
+        of outliers in the data set, by default 0.05.
+
+    Returns
+    -------
+    np.ndarray
+        The anomaly labels for each data point.
+    """
+    iso_forest = IsolationForest(contamination=contamination, random_state=42)
     return iso_forest.fit_predict(X)
 
 
-def print_user_and_activity(df: pd.DataFrame, top_n: int = 5):
-    """Prints user and activity."""
-    for index, row in df.iterrows():
-        print(f"{index+1}. Count: {row['freq']}, Sequence: {row['sequence']}\n")
+def print_user_and_activity(df: pd.DataFrame, top_n: int = 5) -> None:
+    """
+    Prints user and activity.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame containing user and activity data.
+    top_n : int, optional
+        The number of top activities to print, by default 5.
+
+    Returns
+    -------
+    None
+    """
+    for index, (idx, row) in enumerate(df.iterrows(), start=1):
+        print(f"{index}. Count: {row['freq']}, Sequence: {row['sequence']}\n")
+        if index == top_n:
+            break
 
 
-def convertor_review(df: pd.DataFrame, top_n: int = 10):
-    """Review converters and non-converters."""
+def convertor_review(df: pd.DataFrame, top_n: int = 10, reducer: str = "umap") -> None:
+    """Review converters and non-converters.
 
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing user activity data.
+    top_n : int, optional
+        Number of top records to display, by default 10.
+    reducer : str, optional
+        Dimensionality reduction technique to use, by default "umap". Options are "umap" and "pca".
+
+    Returns
+    -------
+    None
+    """
     # Convert activity_list to binary matrix
     mlb = MultiLabelBinarizer()
     X = mlb.fit_transform(df["activity_list"])
 
+    # Impute any missing values in the binary matrix
+    imputer = SimpleImputer(missing_values=np.nan, strategy="most_frequent")
+    X_imputed = imputer.fit_transform(X)
+
     # Standardize the data
-    X_standardized = standardize_data(X)
+    X_standardized = standardize_data(X_imputed)
 
     # Apply PCA to reduce dimensionality
-    Xm = apply_pca(X_standardized)
+    if reducer == "pca":
+        Xm = apply_pca(X_standardized)
+    else:
+        Xm = apply_umap(X_standardized)
 
     # Clustering using HDBSCAN
-    df["cluster"] = perform_clustering(Xm)
+    cluster_labels, _ = perform_clustering(Xm)
+    df["cluster"] = cluster_labels
 
     # Identify clusters that have converters (-1 is noise)
     converter_clusters = [
@@ -64,23 +180,18 @@ def convertor_review(df: pd.DataFrame, top_n: int = 10):
     # Identify non-converters within these clusters
     similar_non_converters = df[
         (df["converted"] == 0) & (df["cluster"].isin(converter_clusters))
-    ]
+    ].copy()
 
     # Anomaly Detection among non-converters using Isolation Forest
-    non_converters_data = df[
-        (df["converted"] == 0) & (df["cluster"].isin(converter_clusters))
-    ].copy()  # Ensure a copy is made to avoid warnings
-    X_non_converters = mlb.transform(non_converters_data["activity_list"])
+    X_non_converters = mlb.transform(similar_non_converters["activity_list"])
+    X_non_converters_standardized = standardize_data(X_non_converters)
 
-    # Apply PCA to reduce dimensionality
-    X_non_converters_pca = apply_pca(X_non_converters)
+    if reducer == "pca":
+        X_non_converters_pca = apply_pca(X_non_converters_standardized)
+    else:
+        X_non_converters_pca = apply_umap(X_non_converters_standardized)
 
-    non_converters_data.loc[:, "anomaly"] = anomaly_detection(
-        X_non_converters_pca
-    )  # Use .loc to avoid warnings
-
-    # Identifying unusual navigation paths
-    unusual_non_converters = non_converters_data[non_converters_data["anomaly"] == -1]
+    similar_non_converters.loc[:, "anomaly"] = anomaly_detection(X_non_converters_pca)
 
     # Selecting top_n similar non-converter sequences
     top_similar_non_converter_seqs = (
@@ -88,7 +199,7 @@ def convertor_review(df: pd.DataFrame, top_n: int = 10):
             [
                 [" -> ".join(i[1]), i[0]]
                 for i in find_frequent_sequences(
-                    similar_non_converters.activity_list.tolist(), min_freq=3, min_len=2
+                    similar_non_converters.activity_list.tolist(), min_freq=2
                 )
             ],
             columns=["sequence", "freq"],
@@ -101,121 +212,36 @@ def convertor_review(df: pd.DataFrame, top_n: int = 10):
     print("Top Similar Non-Converters Sequences:")
     print_user_and_activity(top_similar_non_converter_seqs)
 
-    # Selecting top_n unusual non-converter sequences
-    top_unusual_non_converters_seqs = (
-        pd.DataFrame(
-            [
-                [" -> ".join(i[1]), i[0]]
-                for i in find_frequent_sequences(
-                    unusual_non_converters.activity_list.tolist(), min_freq=2, min_len=1
-                )
-            ],
-            columns=["sequence", "freq"],
-        )
-        .sort_values("freq", ascending=False)
-        .head(top_n)
-    )
-
-    # Printing head of top unusual non-converters
-    print("\nTop Unusual Non-Converter Sequences:")
-    print_user_and_activity(top_unusual_non_converters_seqs)
-
-
-def find_frequent_sequences(sequences, min_freq=10, min_len=3):
-    """Find frequent sequences using PrefixSpan."""
-    ps = PrefixSpan(sequences)
-    ps.minlen = min_len
-    return ps.frequent(min_freq, closed=True)
-
-
-def find_divergence_point(seq1, seq2):
-    """Find the point of divergence between two sequences."""
-    length = max(len(seq1), len(seq2))
-    matches = [
-        1 if i < len(seq1) and i < len(seq2) and seq1[i] == seq2[i] else 0
-        for i in range(length)
+    # Identifying unusual navigation paths
+    unusual_non_converters = similar_non_converters[
+        similar_non_converters["anomaly"] == -1
     ]
-    pct_matches = sum(matches) / length
-    for i in range(length):
-        if i >= len(seq1) or i >= len(seq2) or seq1[i] != seq2[i]:
-            divergence_point = i + 1  # Adding 1 as positions start from 1
-            score = ((pct_matches * length) ** divergence_point) / (length**length)
-            return i, seq1[i:], seq2[i:], score
 
-    return length, ["<none found>"], ["<none found>"], 0  # No divergence found
+    print(f"Number of unusual non-converters: {len(unusual_non_converters)}")
 
-
-def process_pair(non_conv_seq, conv_seq):
-    """Process a pair of sequences."""
-    idx, non_conv_div, conv_div, divergence_score = find_divergence_point(
-        non_conv_seq[1], conv_seq[1]
-    )
-    if idx != len(non_conv_seq[1]) and non_conv_div and conv_div:
-        return {
-            "conversion_seq": conv_seq[1],  # Corrected here
-            "non_conversion_seq": non_conv_seq[1],  # Corrected here
-            "diversion": non_conv_div[0],
-            "divergence_score": divergence_score,
-        }
-    return None
-
-
-def count_subset_sequences(target_seq, all_sequences):
-    """Count how many times a target sequence is a subset of the sequences in a list."""
-    count = 0
-    for seq in all_sequences:
-        if set(target_seq).issubset(set(seq)):
-            count += 1
-    return count
-
-
-def analyze_divergence(df, min_freq: int = 10, top_n: int = 10):
-    """Analyze divergence points."""
-
-    converters = df[df["converted"] == 1]
-    non_converters = df[df["converted"] == 0]
-
-    conv_sequences = find_frequent_sequences(
-        converters["activity_list"].tolist(), min_freq=min_freq
-    )
-    non_conv_sequences = find_frequent_sequences(
-        non_converters["activity_list"].tolist(), min_freq=min_freq
-    )
-
-    pairs = list(product(non_conv_sequences, conv_sequences))
-    results = Parallel(n_jobs=-1)(
-        delayed(process_pair)(non_conv_seq, conv_seq)
-        for non_conv_seq, conv_seq in tqdm(pairs, desc="Processing pairs")
-    )
-
-    results = [
-        result for result in results if result is not None
-    ]  # Filter out None values
-    results_df = pd.DataFrame(results)
-
-    # Prepare a list of all activity_lists to be used for counting
-    all_activity_lists = df["activity_list"].tolist()
-
-    # Count total_sessions where the non-conversion sequence is a subset of activity_list
-    results_df["pct_users"] = results_df["non_conversion_seq"].apply(
-        lambda x: round(
-            count_subset_sequences(x, all_activity_lists) / len(non_converters), 2
+    # Checking if unusual_non_converters is not empty
+    if not unusual_non_converters.empty:
+        # Selecting top_n unusual non-converter sequences
+        top_unusual_non_converters_seqs = (
+            pd.DataFrame(
+                [
+                    [" -> ".join(i[1]), i[0]]
+                    for i in find_frequent_sequences(
+                        unusual_non_converters.activity_list.tolist()
+                    )
+                ],
+                columns=["sequence", "freq"],
+            )
+            .sort_values("freq", ascending=False)
+            .head(top_n)
         )
-    )
 
-    # Convert lists to strings to avoid unhashable type error
-    results_df["conversion_seq"] = results_df["conversion_seq"].apply(
-        lambda x: " -> ".join(x)
-    )
-    results_df["non_conversion_seq"] = results_df["non_conversion_seq"].apply(
-        lambda x: " -> ".join(x)
-    )
-
-    # Remove duplicate rows
-    results_df = results_df.drop_duplicates()
-
-    results_df["weight"] = results_df["divergence_score"] * results_df["pct_users"]
-
-    results_df.sort_values("weight", ascending=False, inplace=True)
-
-    return results_df
+        # If there are no frequent sequences found
+        if top_unusual_non_converters_seqs.empty:
+            print("No frequent sequences found among unusual non-converters.")
+        else:
+            # Printing head of top unusual non-converters
+            print("\nTop Unusual Non-Converter Sequences:")
+            print_user_and_activity(top_unusual_non_converters_seqs)
+    else:
+        print("There are no unusual non-converter sequences detected.")

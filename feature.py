@@ -1,148 +1,76 @@
+"""Feature engineering functions."""
+
+from typing import List, Tuple
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
-from mlxtend.preprocessing import TransactionEncoder
 from prefixspan import PrefixSpan
-from mlxtend.frequent_patterns import apriori, association_rules
-from sequential.seq2pat import Seq2Pat, Attribute
 
 
 def check_sequence(sequence, sub_sequence):
+    """Check if sub_sequence is present in sequence."""
     it = iter(sequence)
     return all(c in it for c in sub_sequence)
 
 
-def plot_important_features_apriori(df: pd.DataFrame, top_n: int = 10):
-    # Convert sequences to binary matrix using mlxtend
-    sequences = df["activity_list"].tolist()
-    te = TransactionEncoder()
-    te_ary = te.fit(sequences).transform(sequences)
-    df_bin = pd.DataFrame(te_ary, columns=te.columns_)
+def find_frequent_sequences(
+    sequences: List[List[str]], min_freq: int = 3, min_len: int = 3
+) -> List[Tuple[int, List[str]]]:
+    """Find frequent sequences using PrefixSpan.
 
-    # Discover frequent itemsets using apriori
-    frequent_itemsets = apriori(
-        df_bin, min_support=0.07, use_colnames=True
-    )  # Adjust min_support as necessary
+    Parameters
+    ----------
+    sequences : List[List[str]]
+        List of sequences.
+    min_freq : int, optional
+        Minimum frequency for a sequence to be considered frequent, by default 3.
+    min_len : int, optional
+        Minimum length for a sequence to be considered, by default 3.
 
-    # Create binary features for each frequent itemset
-    for idx, item in enumerate(frequent_itemsets["itemsets"]):
-        sub_seq = list(item)
-        df[f"seq_{idx}"] = df["activity_list"].apply(
-            lambda x: check_sequence(x, sub_seq)
+    Returns
+    -------
+    List[Tuple[int, List[str]]]
+        List of tuples where each tuple contains the frequency and the sequence.
+    """
+    ps = PrefixSpan(sequences)
+    ps.minlen = min_len
+    return ps.frequent(min_freq, closed=True)
+
+
+def plot_important_features_prefixspan(
+    df: pd.DataFrame, top_n: int = 10, min_freq: int = 10, min_seq_len: int = 3
+) -> None:
+    """Plot important features using PrefixSpan.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame containing the data.
+    top_n : int, optional
+        The number of important features to plot, by default 10.
+    min_freq : int, optional
+        The minimum frequency of the sequence, by default 10.
+    min_seq_len : int, optional
+        The minimum length of the sequence, by default 3.
+
+    Returns
+    -------
+    None
+    """
+
+    # Ensure 'activity_list' and 'converted' columns exist in DataFrame
+    if "activity_list" not in df.columns or "converted" not in df.columns:
+        raise ValueError(
+            "DataFrame must contain 'activity_list' and 'converted' columns."
         )
-
-    # Selecting the sequence columns
-    seq_cols = [col for col in df.columns if col.startswith("seq_")]
-
-    # Prepare data for logistic regression
-    X = df[seq_cols]
-    y = df["converted"]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-
-    # Perform logistic regression
-    log_reg = LogisticRegression()
-    log_reg.fit(X_train, y_train)
-    feature_importance = log_reg.coef_[0]
-
-    # Create DataFrame for feature importance
-    features_df = pd.DataFrame(
-        {
-            "Sequence": [
-                list(frequent_itemsets["itemsets"][i])
-                for i in range(len(frequent_itemsets["itemsets"]))
-            ],
-            "Importance": feature_importance,
-        }
-    )
-
-    # Sort features based on importance
-    features_df = features_df.sort_values(by="Importance", ascending=False)
-
-    # Plot the top N important features
-    top_features_df = features_df.head(top_n).copy()
-    top_features_df["Sequence"] = top_features_df["Sequence"].apply(
-        lambda x: " -> ".join(x)
-    )
-    ax = top_features_df.plot(
-        x="Sequence", y="Importance", kind="barh", figsize=(10, 6)
-    )
-    plt.title(f"Top {top_n} Important Sequences")
-    plt.ylabel("Importance")
-    plt.show()
-
-
-def plot_important_features_seq2pat(df: pd.DataFrame, top_n: int = 10):
-    # Discover frequent sequences using Seq2Pat
-    sequences = df["activity_list"].tolist()
-    seq2pat = Seq2Pat(sequences=sequences)
-    patterns = seq2pat.get_patterns(
-        min_frequency=10
-    )  # Adjust the threshold as necessary
-
-    # Prepare an empty dictionary to hold data
-    new_data = {}
-
-    # Create binary features for each frequent sequence
-    for idx, item in enumerate(patterns):
-        sub_seq = item[:-1]  # Exclude the frequency at the end of each item
-        new_data[f"seq_{idx}"] = df["activity_list"].apply(
-            lambda x: check_sequence(x, sub_seq)
-        )
-
-    # Concatenate all new sequence columns to the original DataFrame
-    df = pd.concat([df, pd.DataFrame(new_data)], axis=1)
-
-    # Selecting the sequence columns
-    seq_cols = [col for col in df.columns if col.startswith("seq_")]
-
-    # Prepare data for logistic regression
-    X = df[seq_cols]
-    y = df["converted"]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-
-    # Perform logistic regression
-    log_reg = LogisticRegression()
-    log_reg.fit(X_train, y_train)
-    feature_importance = log_reg.coef_[0]
-
-    # Create DataFrame for feature importance
-    features_df = pd.DataFrame(
-        {
-            "Sequence": [patterns[i][:-1] for i in range(len(patterns))],
-            "Importance": feature_importance,
-        }
-    )
-
-    # Sort features based on importance
-    features_df = features_df.sort_values(by="Importance", ascending=False)
-
-    # Plot the top N important features using a horizontal bar chart
-    top_features_df = features_df.head(top_n).copy()
-    top_features_df["Sequence"] = top_features_df["Sequence"].apply(
-        lambda x: " -> ".join(x)
-    )
-    top_features_df.plot(x="Sequence", y="Importance", kind="barh", figsize=(10, 6))
-    plt.title(f"Top {top_n} Important Sequences")
-    plt.xlabel("Importance")  # Note that the x and y labels have switched places
-    plt.show()
-
-
-def plot_important_features_prefixspan(df: pd.DataFrame, top_n: int = 10):
-    """Plot important features using PrefixSpan."""
 
     # Discover frequent sequences using PrefixSpan
     sequences = df["activity_list"].tolist()
 
-    ps = PrefixSpan(sequences)
-    ps.minlen = 2  # Adjust the minimum length as necessary
-    frequent_sequences = ps.frequent(
-        20, closed=True
-    )  # Adjust the threshold as necessary
+    frequent_sequences = find_frequent_sequences(
+        sequences, min_freq=min_freq, min_len=min_seq_len
+    )
 
     # Prepare an empty dictionary to hold data
     new_data = {}
@@ -151,7 +79,7 @@ def plot_important_features_prefixspan(df: pd.DataFrame, top_n: int = 10):
     for idx, item in enumerate(frequent_sequences):
         sub_seq = item[1]  # Assuming item[1] contains the sequence
         new_data[f"seq_{idx}"] = df["activity_list"].apply(
-            lambda x: check_sequence(x, sub_seq)
+            lambda x: int(check_sequence(x, sub_seq))
         )
 
     # Concatenate all new sequence columns to the original DataFrame
@@ -163,9 +91,7 @@ def plot_important_features_prefixspan(df: pd.DataFrame, top_n: int = 10):
     # Prepare data for logistic regression
     X = df[seq_cols]
     y = df["converted"]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Perform logistic regression
     log_reg = LogisticRegression()
@@ -175,9 +101,7 @@ def plot_important_features_prefixspan(df: pd.DataFrame, top_n: int = 10):
     # Create DataFrame for feature importance
     features_df = pd.DataFrame(
         {
-            "Sequence": [
-                item[1] for item in frequent_sequences
-            ],  # Changed patterns to frequent_sequences
+            "Sequence": [item[1] for item in frequent_sequences],
             "Importance": feature_importance,
         }
     )
@@ -190,7 +114,12 @@ def plot_important_features_prefixspan(df: pd.DataFrame, top_n: int = 10):
     top_features_df["Sequence"] = top_features_df["Sequence"].apply(
         lambda x: " -> ".join(x)
     )
-    top_features_df.plot(x="Sequence", y="Importance", kind="barh", figsize=(10, 6))
+    top_features_df.plot(x="Sequence", y="Importance", kind="barh", figsize=(10, 10))
     plt.title(f"Top {top_n} Important Sequences")
-    plt.xlabel("Importance")  # Note that the x and y labels have switched places
+    plt.xlabel("Importance")
+    plt.ylabel("Sequence")
+    plt.gca().invert_yaxis()  # Invert y-axis to have the most important feature at the top
     plt.show()
+
+
+# Path: feature.py
