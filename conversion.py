@@ -221,8 +221,6 @@ def converter_review(df: pd.DataFrame, top_n: int = 10, reducer: str = "umap") -
         similar_non_converters["anomaly"] == -1
     ]
 
-    print(f"Number of unusual non-converters: {len(unusual_non_converters)}")
-
     # Checking if unusual_non_converters is not empty
     if not unusual_non_converters.empty:
         # Selecting top_n unusual non-converter sequences
