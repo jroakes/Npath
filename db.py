@@ -83,9 +83,21 @@ def query_bigquery(table_name: str, historical_days: int) -> pd.DataFrame:
     if df is not None:
         return df
 
+    service_account_path = None
+
+    # Check that service account file exists, check in current and parent directories.  If found, set path.
+    if os.path.exists("service_account.json"):
+        service_account_path = "service_account.json"
+    elif os.path.exists("../service_account.json"):
+        service_account_path = "../service_account.json"
+    else:
+        raise ValueError(
+            "Service account file not found. Please ensure that service_account.json is in the current or parent directory."
+        )
+
     # Load your service account credentials
     credentials = service_account.Credentials.from_service_account_file(
-        "service_account.json",
+        service_account_path,
         scopes=["https://www.googleapis.com/auth/cloud-platform"],
     )
 
