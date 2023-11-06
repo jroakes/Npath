@@ -8,5 +8,5 @@ scikit-learn
 tqdm
 pynndescent==0.5.8
 bertopic
-openai
+openai==0.28.1
 InstructorEmbedding
