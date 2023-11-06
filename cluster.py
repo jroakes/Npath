@@ -76,7 +76,13 @@ def analyze_clusters(
     openai.api_key = api_key
 
     representation_model = OpenAI(
-        model="gpt-3.5-turbo", delay_in_seconds=5, prompt=PROMPT, chat=True
+        model=model,
+        delay_in_seconds=5,
+        exponential_backoff=True,
+        diversity=0.5,
+        doc_length=512,
+        prompt=PROMPT,
+        chat=True,
     )
     embedding_model = CustomEmbedder(instruction=INSTRUCTION)
 
