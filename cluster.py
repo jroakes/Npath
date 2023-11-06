@@ -28,7 +28,7 @@ class CustomEmbedder(BaseEmbedder):
         return embeddings
 
 
-INSTRUCTION = "Represent the user journey for users of a website"
+INSTRUCTION = "Represent the intent of the user journey for users of a website"
 
 PROMPT = """
 I have a set of users that have the following page visit journey through our website.
@@ -40,7 +40,7 @@ Here are the journeys:
 
 The pages visited have these keyword themes: [KEYWORDS]
 
-Based on the information above, extract a short topic label that indicates the most likely persona (who is looking for this information) of the users in the following format:
+Based on the information above, extract a short topic label that indicates the most likely persona (who is looking for this information) and intent of the users in the following format:
 topic: <topic label>
 """
 
@@ -80,7 +80,6 @@ def analyze_clusters(
         delay_in_seconds=5,
         exponential_backoff=True,
         diversity=0.5,
-        doc_length=512,
         prompt=PROMPT,
         chat=True,
     )

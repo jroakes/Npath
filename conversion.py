@@ -135,7 +135,7 @@ def print_user_and_activity(df: pd.DataFrame, top_n: int = 5) -> None:
             break
 
 
-def convertor_review(df: pd.DataFrame, top_n: int = 10, reducer: str = "umap") -> None:
+def converter_review(df: pd.DataFrame, top_n: int = 10, reducer: str = "umap") -> None:
     """Review converters and non-converters.
 
     Parameters
@@ -181,6 +181,10 @@ def convertor_review(df: pd.DataFrame, top_n: int = 10, reducer: str = "umap") -
     similar_non_converters = df[
         (df["converted"] == 0) & (df["cluster"].isin(converter_clusters))
     ].copy()
+
+    if len(similar_non_converters) == 0:
+        print("No similar non-converters found")
+        return None
 
     # Anomaly Detection among non-converters using Isolation Forest
     X_non_converters = mlb.transform(similar_non_converters["activity_list"])
