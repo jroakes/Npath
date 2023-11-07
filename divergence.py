@@ -164,10 +164,6 @@ def analyze_divergence(
     ]  # Filter out None values
     results_df = pd.DataFrame(results)
 
-    # Prepare a list of all activity_lists to be used for counting
-    # all_activity_lists = df["activity_list"].tolist()
-    # len_non_converters = len(non_converters)
-
     # Convert lists to strings to avoid unhashable type error
     results_df["conversion_seq"] = results_df["conversion_seq"].apply(" -> ".join)
     results_df["non_conversion_seq"] = results_df["non_conversion_seq"].apply(
@@ -182,3 +178,6 @@ def analyze_divergence(
     results_df.sort_values("weight", ascending=False, inplace=True)
 
     return results_df.head(top_n)
+
+
+# Path: divergence.py

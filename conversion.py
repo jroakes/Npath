@@ -247,3 +247,6 @@ def converter_review(df: pd.DataFrame, top_n: int = 10, reducer: str = "umap") -
             print_user_and_activity(top_unusual_non_converters_seqs)
     else:
         print("There are no unusual non-converter sequences detected.")
+
+
+# Path: conversion.py

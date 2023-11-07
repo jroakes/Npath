@@ -1,3 +1,5 @@
+"""Cluster module."""
+
 import openai
 import pandas as pd
 from bertopic.representation import OpenAI
@@ -104,3 +106,6 @@ def analyze_clusters(
     topic_model.visualize_topics()
 
     return topic_model
+
+
+# Path: cluster.py

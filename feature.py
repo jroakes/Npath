@@ -8,7 +8,7 @@ from sklearn.linear_model import LogisticRegression
 from prefixspan import PrefixSpan
 
 
-def check_sequence(sequence, sub_sequence):
+def check_sequence(sequence, sub_sequence) -> bool:
     """Check if sub_sequence is present in sequence."""
     it = iter(sequence)
     return all(c in it for c in sub_sequence)
