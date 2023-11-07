@@ -11,7 +11,7 @@ Exploring path sequences in GA4 BigQuery data
 2. Enable the BigQuery API
 3. Ensure that GA4 data is being sent to BigQuery
 4. Get the dataset ID and table ID for the GA4 data
-5. Create a service account with BigQuery read access
+5. Create a service account with BigQuery read access. [Here](https://docs.aws.amazon.com/dms/latest/sbs/bigquery-redshift-migration-step-1.html) is a good guide.
 6. Download the service account key as a JSON file
 7. Create a new file in the root directory called `service_account.json` and paste the contents of the JSON file into it
 8. Run `pip install -r requirements.txt` to install the required Python packages
