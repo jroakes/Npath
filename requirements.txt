@@ -10,3 +10,5 @@ pynndescent==0.5.8
 bertopic
 openai==0.28.1
 InstructorEmbedding
+sgt
+pandarallel
