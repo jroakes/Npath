@@ -164,6 +164,9 @@ def analyze_divergence(
     ]  # Filter out None values
     results_df = pd.DataFrame(results)
 
+    print(f"Found {len(results_df)} divergent sequences.")
+    print(results_df.head())
+
     # Convert lists to strings to avoid unhashable type error
     results_df["conversion_seq"] = results_df["conversion_seq"].apply(" -> ".join)
     results_df["non_conversion_seq"] = results_df["non_conversion_seq"].apply(

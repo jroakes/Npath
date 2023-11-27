@@ -23,3 +23,18 @@ Exploring path sequences in GA4 BigQuery data
 * `convertor_review`: Sequence Patterns of Similarity and Anomalies in Non-Convertors that are clustered with Convertors
 * `analyze_divergence`: Scores the similarity of non-convertor to convertor sequences.
 * `analyze_clusters`: Clusters users based on their navigational paths and labels clusters.
+
+
+## To Do
+- [ ] Add more documentation
+- [ ] Update sequence importance for sequences that pass through certain pages.
+- [ ] Add more sequence mining algorithms
+- [x] Add attribution models
+- [x] Remove sequences after conversion
+- [x] Add sequence divergence
+- [ ] Analysis by section
+- [ ] Analysis through product/service page
+- [ ] Analysis through blog
+- [ ] Analysis through pricing page
+- [ ] Analysis by source/medium
+- [ ] Analysis to score pages based on their importance (presence in conversion and closeness to conversion)

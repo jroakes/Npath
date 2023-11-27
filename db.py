@@ -35,24 +35,35 @@ raw_ga_4 AS (
 
 events AS (
     SELECT
-        parse_date('%Y%m%d', event_date) event_date,
+        parse_date('%Y%m%d', max(event_date)) event_date,
         event_name,
         timestamp_micros(event_timestamp) as event_timestamp,
         user_pseudo_id,
-        timestamp_micros(user_first_touch_timestamp) as user_first_touch_timestamp,
-        geo.region as geo_region,
-        geo.city as geo_city,
-        traffic_source.name as channel,
-        traffic_source.source as source,
-        max(if(params.key = 'ga_session_id', params.value.int_value, null)) ga_session_id,
+
+        COALESCE(NULLIF(MAX(geo.region), ''), '(not set)') AS geo_region,
+        COALESCE(NULLIF(MAX(geo.city), ''), '(not set)') AS geo_city,
+        COALESCE(NULLIF(MAX(device.category), ''), '(not set)') AS device_category,
+
+        concat(user_pseudo_id, '.',max(if(params.key = 'ga_session_id', params.value.int_value, null))) ga_session_id,
         max(if(params.key = 'ga_session_number', params.value.int_value, null)) ga_session_number,
-        cast(max(if(params.key = 'session_engaged', params.value.string_value, null)) as int64) session_engaged,
+        ifnull(cast(max(if(params.key = 'session_engaged', params.value.string_value, null)) as int64), 0) session_engaged,
         max(if(params.key = 'page_location', params.value.string_value, null)) page_location,
         max(if(params.key = 'page_title', params.value.string_value, null)) page_title,
+
+        -- If there are no values for the traffic, we default to inital user values.  collected_traffic_source is new in June 2023.
+        -- This gets close to GA4 Actual data.
+        ifnull(ifnull(max(collected_traffic_source.manual_campaign_name), max(traffic_source.name)), '(not set)') campaign,
+        ifnull(ifnull(max(collected_traffic_source.manual_medium), max(traffic_source.medium)), '(not set)') medium,
+        ifnull(ifnull(max(collected_traffic_source.manual_source), max(traffic_source.source)), '(not set)') source,
+
+        concat(ifnull(ifnull(max(collected_traffic_source.manual_source), max(traffic_source.source)), '(direct)'), " / ", ifnull(ifnull(max(collected_traffic_source.manual_medium), max(traffic_source.medium)), '(not set)')) source_medium
+
         FROM raw_ga_4,
         UNNEST(event_params) AS params
-        GROUP BY event_date, event_name, event_timestamp, user_pseudo_id, user_first_touch_timestamp, channel, source, geo_region, geo_city
+        WHERE user_pseudo_id IS NOT NULL
+        GROUP BY user_pseudo_id, event_timestamp, event_name
         )
+
 
 
 SELECT
@@ -140,7 +151,7 @@ def cached(table_name: str) -> pd.DataFrame:
 
     # Check for cached file, return if it exists
     if os.path.exists(file_path):
-        return pd.read_csv(file_path)
+        return pd.read_csv(file_path, low_memory=False)
 
     return None
 
